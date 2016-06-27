@@ -27,8 +27,8 @@ Vector3f P = Vector3f( 2.20 , 4.00 , 1.60 ); 				//( 2.20 , 4.00 , 1.60 );
 Vector3f I = Vector3f( 0.00 , 0.00 , 0.00 ); 				//( 0.00 , 0.00 , 0.00 );
 Vector3f D = Vector3f( 1.00 , 1.30 , 1.10 ); 				//( 1.00 , 1.30 , 1.10 );
 Vector3f PID_alt = Vector3f(  1.00 , 0.10 , 0.00 ); 		//( 1.00 , 0.10 , 0.00 );
-Vector3f TrimMoment = Vector3f( 0 , 0 , 0 ); 				//( 0.00 , 0.07 , 0.00 );
-Vector3f TrimOrient = Vector3f( 0 , 0 , 0 ) * M_PI / 180;	//( 0.00 , 0.00 , 0.00 );
+Vector3f TrimMoment = Vector3f( 0 , 0.11 , 0.01 ); 				//( 0.00 , 0.07 , 0.00 );
+Vector3f TrimOrient = Vector3f( 0 , 0    , 0 ) * M_PI / 180;	//( 0.00 , 0.00 , 0.00 );
 
 
 // ================================================================================================
@@ -306,6 +306,7 @@ void loop (void)
         last_controlled = now;
 
         P.z = 3.0f / 500.0f * hal.rcin->read(5) - 8; // **
+        //P.z = 0;
 
         moment_p.x = 0.1524 * (P.x * errPhiThetaPsi.x +I.x * errPhiThetaPsiINT.x + D.x * errPhiThetaPsiDER.x) + TrimMoment.x;
         moment_p.y = 0.3700 * (P.y * errPhiThetaPsi.y +I.y * errPhiThetaPsiINT.y + D.y * errPhiThetaPsiDER.y) + TrimMoment.y;
@@ -313,8 +314,8 @@ void loop (void)
 
         moment_p.x = floLimit(moment_p.x, 0.2, -0.2);
 
-        fx_d = (hal.rcin->read(2) - 1000.0f) / 1000.0f * 16.0f;
-        //fx_d = altERR * PID_alt.x + altINT * PID_alt.y + fx_trim;
+        //fx_d = (hal.rcin->read(2) - 1000.0f) / 1000.0f * 16.0f;
+        fx_d = altERR * PID_alt.x + altINT * PID_alt.y + fx_trim;
 
         // Turn moment controls into physical controls.
         elevL =-1.0f * atan2f(moment_p.y/0.3700 - moment_p.x/0.1524, fx_d + moment_p.z/0.1524);
@@ -337,13 +338,14 @@ void loop (void)
 
         // Write the values to the servos and ESCs.
         uint16_t switchValue = hal.rcin->read(4);
-        if (switchValue < 1500) {
+        hal.console->printf("%d\n",switchValue);
+        if (switchValue < 1250) {
             hal.rcout->write(0, pwm_elevL);
             hal.rcout->write(1, pwm_elevR);
-            //hal.rcout->write(2, pwm_motorL);
-            //hal.rcout->write(3, pwm_motorR);
-            hal.rcout->write(2, 1000);
-            hal.rcout->write(3, 1000);
+            hal.rcout->write(2, pwm_motorL);
+            hal.rcout->write(3, pwm_motorR);
+            //hal.rcout->write(2, 1000);
+            //hal.rcout->write(3, 1000);
         } else {
             hal.rcout->write(0, 1500);
             hal.rcout->write(1, 1500);
@@ -352,11 +354,10 @@ void loop (void)
             pwm_elevL = 1500;
             pwm_elevR = 1500;
             pwm_motorL = 1000;
+            pwm_motorR = 1000;
         }
 
-        hal.console->printf("%4d,%4d,%4d,%4d\n",pwm_elevL,pwm_elevR,pwm_motorL,pwm_motorR);
-
-        if (switchValue > 1500) {
+        if (switchValue > 1750) {
             t_alt = 0.5 - alt;
         }
 
