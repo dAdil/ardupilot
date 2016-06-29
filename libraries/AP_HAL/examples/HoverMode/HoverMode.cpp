@@ -25,7 +25,7 @@ AP_AHRS_DCM ahrs(ins, baro, gps);
 // Gains
 Vector3f P = Vector3f( 2.20 , 4.00 , 1.60 ); 				//( 2.20 , 4.00 , 1.60 );
 Vector3f I = Vector3f( 0.00 , 0.00 , 0.00 ); 				//( 0.00 , 0.00 , 0.00 );
-Vector3f D = Vector3f( 1.00 , 1.30 , 1.10 ); 				//( 1.00 , 1.30 , 1.10 );
+Vector3f D = Vector3f( 1.00 , 1.30 , 1.30 ); 				//( 1.00 , 1.30 , 1.10 );
 Vector3f PID_alt = Vector3f(  1.00 , 0.10 , 0.00 ); 		//( 1.00 , 0.10 , 0.00 );
 Vector3f TrimMoment = Vector3f( 0 , 0.11 , 0.01 ); 				//( 0.00 , 0.07 , 0.00 );
 Vector3f TrimOrient = Vector3f( 0 , 0    , 0 ) * M_PI / 180;	//( 0.00 , 0.00 , 0.00 );
@@ -38,7 +38,7 @@ Vector3f TrimOrient = Vector3f( 0 , 0    , 0 ) * M_PI / 180;	//( 0.00 , 0.00 , 0
 // Constants for gyroscope filters.
 // a=0.029 | 5Hz Lag
 // a=0.010 | 1.75Hz Lag (To 90%)
-Vector3f a = Vector3f( 0.029 , 0.029 , 0.02 );
+Vector3f a = Vector3f( 0.029 , 0.029 , 0.040 ); // ** ( 0.029 , 0.029 , 0.029 )
 
 Vector3f moment_p;
 float    fx_d;
@@ -371,7 +371,7 @@ void loop (void)
     if (now - last_print > 100000) {
         last_print = now;
 
-        hal.console->printf("%6.1f | %6.1f | %6.1f\n",ToDeg(errPhiThetaPsi.x),ToDeg(errPhiThetaPsi.y),ToDeg(errPhiThetaPsi.z));
+        hal.console->printf("%6.1f\n",P.z);
 
         //
         struct log_Test pkt = {
