@@ -311,6 +311,10 @@ void loop (void)
         moment_p.y = 0.3700 * (P.y * errPhiThetaPsi.y +I.y * errPhiThetaPsiINT.y + D.y * errPhiThetaPsiDER.y) + TrimMoment.y;
         moment_p.z = 0.1524 * (P.z * errPhiThetaPsi.z +I.z * errPhiThetaPsiINT.z + D.z * errPhiThetaPsiDER.z) + TrimMoment.z;
 
+        //Rate controller implementation: Comment out
+        //float K = 4.5;
+        //moment_p.z = 0.3700 * (((errPhiThetaPsi.z * K) - pqr.z)*P.z) + TrimMoment.z;
+
         moment_p.x = floLimit(moment_p.x, 0.2, -0.2);
 
         //fx_d = (hal.rcin->read(2) - 1000.0f) / 1000.0f * 16.0f;
