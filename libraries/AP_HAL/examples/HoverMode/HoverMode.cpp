@@ -252,15 +252,14 @@ void loop (void)
         alt = a_alt * baro.get_altitude() + (1-a_alt) * altOld;
         altERR = d_alt - (alt + t_alt);
 
-
-        dcm_matrix.from_euler(0, 0, 0); // **
-        Compasss.read();
-        heading = Compasss.calculate_heading(dcm_matrix);
-
         // Update the orientation values and filter the rates.
-        phiThetaPsi.x   = -heading;
         phiThetaPsi.y   =  ahrs.pitch;
         phiThetaPsi.z   =  ahrs.roll;
+        dcm_matrix.from_euler(phiThetaPsi.z, phiThetaPsi.y, 0);
+        Compasss.read();
+        heading = Compasss.calculate_heading(dcm_matrix);
+        phiThetaPsi.x = -heading;
+
         quat_a.from_euler(phiThetaPsi.x,phiThetaPsi.y,phiThetaPsi.z);
 
         phiThetaPsi.x = quat_a.get_euler_roll();
@@ -338,7 +337,6 @@ void loop (void)
 
         // Write the values to the servos and ESCs.
         uint16_t switchValue = hal.rcin->read(4);
-        hal.console->printf("%d\n",switchValue);
         if (switchValue < 1250) {
             hal.rcout->write(0, pwm_elevL);
             hal.rcout->write(1, pwm_elevR);
@@ -361,6 +359,17 @@ void loop (void)
             t_alt = 0.5 - alt;
         }
 
+
+    }
+
+
+    // Calculate the responses and write to telemetry at 10Hz.
+    if (now - last_print > 100000) {
+        last_print = now;
+
+        hal.console->printf("%6.1f | %6.1f | %6.1f\n",ToDeg(errPhiThetaPsi.x),ToDeg(errPhiThetaPsi.y),ToDeg(errPhiThetaPsi.z));
+
+        //
         struct log_Test pkt = {
             LOG_PACKET_HEADER_INIT(LOG_TEST_MSG),
             t       : (AP_HAL::micros()/1000000.0f),
@@ -380,37 +389,6 @@ void loop (void)
             fx      : fx_d,
         };
         dataflash.WriteBlock(&pkt, sizeof(pkt));
-    }
-
-
-    // Calculate the responses and write to telemetry at 10Hz.
-    if (now - last_print > 100000 /* 100ms = 10Hz*/) {
-        last_print = now;
-
-        hal.uartC->printf("t,%6.2f,a,%4.0f,%4.0f,%4.0f,b,%4.0f,%4.0f"
-        		",%4.0f,c,%4.0f,%4.0f,%4.0f,d,%4.0f,%4.0f,e,%4.0f,%4.0f"
-        		",%4.0f,f,%5.2f,%5.2f,%5.2f,g,%5.2f,%5.2f,%5.2f,h,%5.2f"
-        		",%5.2f,%5.2f,i,%5.2f,%5.2f,%5.2f,j,%4.1f,k,%5.1f,%5.1f"
-        		",%4.1f,%4.1f,l,%4d,%4d,%4d,%4d\n",
-                (AP_HAL::micros()/1000000.0f),
-                ToDeg(phiThetaPsi.x),ToDeg(phiThetaPsi.y),
-				ToDeg(phiThetaPsi.z),
-                ToDeg(ahrs.roll),ToDeg(ahrs.pitch),ToDeg(ahrs.yaw),
-                ToDeg(pqr.x),ToDeg(pqr.y),ToDeg(pqr.z),
-                -(1.0f*hal.rcin->read(1)-1500.0f)/500.0f*15.0f,
-				(1.0f*hal.rcin->read(3)-1500.0f)/500.0f*15.0f,
-                ToDeg(errPhiThetaPsi.x),ToDeg(errPhiThetaPsi.y),
-				ToDeg(errPhiThetaPsi.z),
-                P.x * errPhiThetaPsi.x,P.y * errPhiThetaPsi.y,
-				P.z * errPhiThetaPsi.z,
-                I.x * errPhiThetaPsiINT.x,I.y * errPhiThetaPsiINT.y,I.z
-				* errPhiThetaPsiINT.z,
-                D.x * errPhiThetaPsiDER.x,D.y * errPhiThetaPsiDER.y,D.z
-				* errPhiThetaPsiDER.z,
-                moment_p.x,moment_p.y,moment_p.z,
-                fx_d,
-                ToDeg(elevL),ToDeg(elevR),throttleL,throttleR,
-                pwm_elevL,pwm_elevR,pwm_motorL,pwm_motorR);
     }
 
 
