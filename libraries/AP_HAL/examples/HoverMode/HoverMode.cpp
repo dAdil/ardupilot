@@ -25,7 +25,7 @@ AP_AHRS_DCM ahrs(ins, baro, gps);
 // Gains
 Vector3f P = Vector3f( 2.20 , 4.00 , 1.60 ); 				//( 2.20 , 4.00 , 1.60 );
 Vector3f I = Vector3f( 0.00 , 0.00 , 0.00 ); 				//( 0.00 , 0.00 , 0.00 );
-Vector3f D = Vector3f( 1.00 , 1.30 , 1.30 ); 				//( 1.00 , 1.30 , 1.10 );
+Vector3f D = Vector3f( 1.00 , 1.30 , 1.50 ); 				//( 1.00 , 1.30 , 1.50 );
 Vector3f PID_alt = Vector3f(  1.00 , 0.10 , 0.00 ); 		//( 1.00 , 0.10 , 0.00 );
 Vector3f TrimMoment = Vector3f( 0 , 0.11 , 0.01 ); 				//( 0.00 , 0.07 , 0.00 );
 Vector3f TrimOrient = Vector3f( 0 , 0    , 0 ) * M_PI / 180;	//( 0.00 , 0.00 , 0.00 );
@@ -38,7 +38,7 @@ Vector3f TrimOrient = Vector3f( 0 , 0    , 0 ) * M_PI / 180;	//( 0.00 , 0.00 , 0
 // Constants for gyroscope filters.
 // a=0.029 | 5Hz Lag
 // a=0.010 | 1.75Hz Lag (To 90%)
-Vector3f a = Vector3f( 0.029 , 0.029 , 0.040 ); // ** ( 0.029 , 0.029 , 0.029 )
+Vector3f a = Vector3f( 0.070 , 0.070 , 0.070 ); // ** ( 0.07 , 0.07 , 0.07 )
 
 Vector3f moment_p;
 float    fx_d;
@@ -71,6 +71,11 @@ float    altOld;
 
 
 float heading;
+float target_heading = 0;
+float target_theta;
+float target_psi;
+float yaw_rate_input;
+float max_heading_rate = 10 * M_PI / 180;
 Matrix3f dcm_matrix;
 
 Vector3f    eul_d = Vector3f(0,0,0);          // Desired eulers
@@ -252,6 +257,14 @@ void loop (void)
         alt = a_alt * baro.get_altitude() + (1-a_alt) * altOld;
         altERR = d_alt - (alt + t_alt);
 
+        yaw_rate_input = hal.rcin->read(3);
+        if (yaw_rate_input > 1600 || yaw_rate_input < 1400) {
+        	target_heading = target_heading + ((((yaw_rate_input-1000.0f)/500.0f)-1.0f) * max_heading_rate)*(timeNew-timeOld)/1000000.0f;
+        }
+
+        target_theta = - (1.0f * hal.rcin->read(1) - 1500.0f) / 500.0f * (13.0f * M_PI / 180.0f);
+        target_psi   = - (1.0f * hal.rcin->read(0) - 1500.0f) / 500.0f * (13.0f * M_PI / 180.0f);
+
         // Update the orientation values and filter the rates.
         phiThetaPsi.y   =  ahrs.pitch;
         phiThetaPsi.z   =  ahrs.roll;
@@ -279,11 +292,13 @@ void loop (void)
         quat_c.q3 = -quat_c.q3;
         quat_c.q4 = -quat_c.q4;
 
+        quat_d.from_euler(target_heading,target_theta,target_psi);
+
         quat_e = quatMultiply(quat_c,quat_d);
 
         errPhiThetaPsi.x = 2 * acosf(quat_e.q1) * quat_e.q2 / sinf(acosf(quat_e.q1)) + TrimOrient.x;
-        errPhiThetaPsi.y = 2 * acosf(quat_e.q1) * quat_e.q3 / sinf(acosf(quat_e.q1)) - (1.0f * hal.rcin->read(1) - 1500.0f) / 500.0f * (13.0f * M_PI / 180.0f) + TrimOrient.y;
-        errPhiThetaPsi.z = 2 * acosf(quat_e.q1) * quat_e.q4 / sinf(acosf(quat_e.q1)) - (1.0f * hal.rcin->read(0) - 1500.0f) / 500.0f * (13.0f * M_PI / 180.0f) + TrimOrient.z;
+        errPhiThetaPsi.y = 2 * acosf(quat_e.q1) * quat_e.q3 / sinf(acosf(quat_e.q1)) + TrimOrient.y;
+        errPhiThetaPsi.z = 2 * acosf(quat_e.q1) * quat_e.q4 / sinf(acosf(quat_e.q1)) + TrimOrient.z;
 
         if (hal.rcin->read(4) < 1500) {
             errPhiThetaPsiINT = errPhiThetaPsiINT + errPhiThetaPsi * (timeNew - timeOld)/1000000;
@@ -304,7 +319,7 @@ void loop (void)
     if (now - last_controlled > 10000 /* 10ms = 100Hz*/) {
         last_controlled = now;
 
-        P.z = 3.0f / 500.0f * hal.rcin->read(5) - 8; // **
+        P.z = ((hal.rcin->read(5) - 1500)/500) + 4.5; // **
         //P.z = 0;
 
         moment_p.x = 0.1524 * (P.x * errPhiThetaPsi.x +I.x * errPhiThetaPsiINT.x + D.x * errPhiThetaPsiDER.x) + TrimMoment.x;
@@ -371,7 +386,7 @@ void loop (void)
     if (now - last_print > 100000) {
         last_print = now;
 
-        hal.console->printf("%6.1f\n",P.z);
+        hal.console->printf("%6.1f | %6.1f | %6.1f | %6.1f\n",ToDeg(errPhiThetaPsi.x),ToDeg(errPhiThetaPsi.y),ToDeg(errPhiThetaPsi.z),ToDeg(target_theta));
 
         //
         struct log_Test pkt = {
